@@ -1,11 +1,14 @@
 package com.example.usermanagement.service;
 
-import com.example.usermanagement.dto.AttendanceDTO;
+import com.example.usermanagement.dto.request.AttendanceCheckInRequest;
+import com.example.usermanagement.dto.request.AttendanceCheckOutRequest;
+import com.example.usermanagement.dto.response.AttendanceResponse;
 import com.example.usermanagement.entity.Attendance;
 import com.example.usermanagement.entity.AttendanceScore;
 import com.example.usermanagement.entity.Employee;
 import com.example.usermanagement.entity.LeaveRequest;
 import com.example.usermanagement.entity.enums.RequestStatus;
+import com.example.usermanagement.mapper.AttendanceMapper;
 import com.example.usermanagement.repository.AttendanceRepository;
 import com.example.usermanagement.repository.AttendanceScoreRepository;
 import com.example.usermanagement.repository.EmployeeRepository;
@@ -48,8 +51,20 @@ class AttendanceServiceTest {
     @Mock
     private LeaveRequestRepository leaveRequestRepository;
 
-    @InjectMocks
     private AttendanceService attendanceService;
+
+    private final AttendanceMapper attendanceMapper = new AttendanceMapper();
+
+    @org.junit.jupiter.api.BeforeEach
+    void setUp() {
+        attendanceService = new AttendanceService(
+                employeeRepository,
+                attendanceRepository,
+                attendanceScoreRepository,
+                leaveRequestRepository,
+                attendanceMapper
+        );
+    }
 
     @Test
     void checkIn_marksLateAndReturnsWarningWhenPreviousDayOpen() {
@@ -74,8 +89,8 @@ class AttendanceServiceTest {
         when(attendanceScoreRepository.save(any(AttendanceScore.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(leaveRequestRepository.findByEmployeeIdAndStatus(any(), any())).thenReturn(List.of());
 
-        AttendanceDTO.Response response = attendanceService.checkIn(
-                AttendanceDTO.CheckInRequest.builder()
+        AttendanceResponse response = attendanceService.checkIn(
+                AttendanceCheckInRequest.builder()
                         .employeeId(employeeId)
                         .checkInAt(LocalDateTime.of(2026, 4, 28, 8, 45))
                         .build()
@@ -108,8 +123,8 @@ class AttendanceServiceTest {
         when(attendanceScoreRepository.save(any(AttendanceScore.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(leaveRequestRepository.findByEmployeeIdAndStatus(any(), any())).thenReturn(List.of());
 
-        AttendanceDTO.Response response = attendanceService.checkOut(
-                AttendanceDTO.CheckOutRequest.builder()
+        AttendanceResponse response = attendanceService.checkOut(
+                AttendanceCheckOutRequest.builder()
                         .employeeId(employeeId)
                         .checkOutAt(LocalDateTime.of(2026, 4, 28, 14, 0))
                         .build()

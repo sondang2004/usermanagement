@@ -1,6 +1,7 @@
 package com.example.usermanagement.exception;
 
 import com.example.usermanagement.dto.ApiResponse;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -40,9 +41,15 @@ public class GlobalExceptionHandler {
         return ApiResponse.error(ex.getMessage());
     }
 
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiResponse<Object> handleDataIntegrityViolationException(DataIntegrityViolationException ex) {
+        return ApiResponse.error("Duplicate or invalid data");
+    }
+
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public ApiResponse<Object> handleGeneralException(Exception ex) {
-        return ApiResponse.error("An unexpected error occurred: " + ex.getMessage());
+        return ApiResponse.error("An unexpected error occurred");
     }
 }

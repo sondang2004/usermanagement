@@ -1,9 +1,12 @@
 package com.example.usermanagement.controller;
 
 import com.example.usermanagement.dto.ApiResponse;
-import com.example.usermanagement.dto.AttendanceDTO;
-import com.example.usermanagement.dto.AttendancePenaltyDayDTO;
-import com.example.usermanagement.dto.AttendanceSummaryDTO;
+import com.example.usermanagement.dto.request.AttendanceCheckInRequest;
+import com.example.usermanagement.dto.request.AttendanceCheckOutRequest;
+import com.example.usermanagement.dto.response.AttendanceMonthlySummaryResponse;
+import com.example.usermanagement.dto.response.AttendancePenaltyDayResponse;
+import com.example.usermanagement.dto.response.AttendanceResponse;
+import com.example.usermanagement.dto.response.AttendanceSummaryResponse;
 import com.example.usermanagement.service.AttendanceService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -26,17 +29,17 @@ public class AttendanceController {
     private final AttendanceService attendanceService;
 
     @PostMapping("/check-in")
-    public ApiResponse<AttendanceDTO.Response> checkIn(@Valid @RequestBody AttendanceDTO.CheckInRequest request) {
+    public ApiResponse<AttendanceResponse> checkIn(@Valid @RequestBody AttendanceCheckInRequest request) {
         return ApiResponse.success(attendanceService.checkIn(request), "Check-in successful");
     }
 
     @PostMapping("/check-out")
-    public ApiResponse<AttendanceDTO.Response> checkOut(@Valid @RequestBody AttendanceDTO.CheckOutRequest request) {
+    public ApiResponse<AttendanceResponse> checkOut(@Valid @RequestBody AttendanceCheckOutRequest request) {
         return ApiResponse.success(attendanceService.checkOut(request), "Check-out successful");
     }
 
     @GetMapping("/{employeeId}")
-    public ApiResponse<AttendanceDTO.MonthlySummary> getAttendance(
+    public ApiResponse<AttendanceMonthlySummaryResponse> getAttendance(
             @PathVariable UUID employeeId,
             @RequestParam(required = false) Integer month,
             @RequestParam(required = false) Integer year,
@@ -47,7 +50,7 @@ public class AttendanceController {
 
 
     @GetMapping("/{employeeId}/summary")
-    public ApiResponse<AttendanceSummaryDTO.Response> getAttendanceSummary(
+    public ApiResponse<AttendanceSummaryResponse> getAttendanceSummary(
             @PathVariable UUID employeeId,
             @RequestParam(required = false) Integer month,
             @RequestParam(required = false) Integer year) {
@@ -55,7 +58,7 @@ public class AttendanceController {
     }
 
     @GetMapping("/{employeeId}/penalty-days")
-    public ApiResponse<List<AttendancePenaltyDayDTO.Response>> getPenaltyDays(
+    public ApiResponse<List<AttendancePenaltyDayResponse>> getPenaltyDays(
             @PathVariable UUID employeeId,
             @RequestParam(required = false) Integer month,
             @RequestParam(required = false) Integer year) {
