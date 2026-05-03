@@ -23,6 +23,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.UnexpectedRollbackException;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.DayOfWeek;
@@ -38,7 +40,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AttendanceService {
@@ -73,6 +77,7 @@ public class AttendanceService {
         attendance.setEmployee(employee);
         attendance.setAttendanceDate(attendanceDate);
         attendance.setCheckInTime(checkInAt.toLocalTime());
+
         attendance.setLate(checkInAt.toLocalTime().isAfter(LATE_THRESHOLD));
         attendance.setLateMinutes(attendance.isLate()
                 ? (int) Duration.between(LATE_THRESHOLD, checkInAt.toLocalTime()).toMinutes()
@@ -82,8 +87,15 @@ public class AttendanceService {
         attendance.setUndertimeMinutes(0);
         attendance.setOvertimeMinutes(0);
         attendance.setWorkingHours(0.0);
-
         Attendance saved = attendanceRepository.save(attendance);
+
+        try {
+            validateCheckIn(saved);
+        }
+        catch (Exception e) {
+            log.warn("Validation failed: {}", e.getMessage());
+        }
+
         recalculateMonthlyScore(employee.getId(), attendanceDate.getYear(), attendanceDate.getMonthValue());
         return attendanceMapper.toResponse(saved, warning);
     }
@@ -91,22 +103,26 @@ public class AttendanceService {
     @Transactional
     public AttendanceResponse checkOut(AttendanceCheckOutRequest request) {
         Employee employee = getEmployee(request.getEmployeeId());
-        LocalDateTime checkOutAt = request.getCheckOutAt() != null ? request.getCheckOutAt() : LocalDateTime.now(ZONE_ID);
+        LocalDateTime checkOutAt = request.getCheckOutAt() != null ? request.getCheckOutAt()
+                : LocalDateTime.now(ZONE_ID);
 
         Attendance attendance = attendanceRepository
                 .findTopByEmployeeIdAndCheckOutTimeIsNullOrderByAttendanceDateDescCheckInTimeDesc(employee.getId())
-                .orElseThrow(() -> new InvalidRequestException("No open attendance record found for employee " + employee.getId()));
+                .orElseThrow(() -> new InvalidRequestException(
+                        "No open attendance record found for employee " + employee.getId()));
 
         attendance.setCheckOutTime(checkOutAt.toLocalTime());
         attendance.recalculateWorkingHours();
         Attendance saved = attendanceRepository.save(attendance);
 
-        recalculateMonthlyScore(employee.getId(), attendance.getAttendanceDate().getYear(), attendance.getAttendanceDate().getMonthValue());
+        recalculateMonthlyScore(employee.getId(), attendance.getAttendanceDate().getYear(),
+                attendance.getAttendanceDate().getMonthValue());
         return attendanceMapper.toResponse(saved, null);
     }
 
     @Transactional
-    public AttendanceMonthlySummaryResponse getAttendance(UUID employeeId, Integer month, Integer year, int page, int size) {
+    public AttendanceMonthlySummaryResponse getAttendance(UUID employeeId, Integer month, Integer year, int page,
+            int size) {
         getEmployee(employeeId);
 
         LocalDate reference = LocalDate.now(ZONE_ID);
@@ -118,7 +134,8 @@ public class AttendanceService {
 
         Pageable pageable = PageRequest.of(page, size);
         Page<Attendance> attendancePage = attendanceRepository
-                .findByEmployeeIdAndAttendanceDateBetweenOrderByAttendanceDateAsc(employeeId, startDate, endDate, pageable);
+                .findByEmployeeIdAndAttendanceDateBetweenOrderByAttendanceDateAsc(employeeId, startDate, endDate,
+                        pageable);
 
         List<AttendanceResponse> responses = attendancePage.getContent().stream()
                 .map(attendance -> attendanceMapper.toResponse(attendance, null))
@@ -136,8 +153,7 @@ public class AttendanceService {
                 scoreSnapshot.undertimeCount(),
                 scoreSnapshot.overtimeCount(),
                 responses,
-                attendancePage
-        );
+                attendancePage);
     }
 
     @Transactional
@@ -183,7 +199,8 @@ public class AttendanceService {
         LocalDate startDate = yearMonth.atDay(1);
         LocalDate endDate = yearMonth.atEndOfMonth();
 
-        return buildPenaltyDays(employeeId, targetYear, targetMonth, loadMonthlyContext(employeeId, startDate, endDate));
+        return buildPenaltyDays(employeeId, targetYear, targetMonth,
+                loadMonthlyContext(employeeId, startDate, endDate));
     }
 
     @Transactional
@@ -274,8 +291,7 @@ public class AttendanceService {
                 (int) ABSENT_PENALTY,
                 0,
                 0,
-                false
-        );
+                false);
     }
 
     private AttendancePenaltyDayResponse toApprovedLeavePenaltyDay(LocalDate date) {
@@ -289,8 +305,7 @@ public class AttendanceService {
                 0,
                 0,
                 0,
-                true
-        );
+                true);
     }
 
     private AttendancePenaltyDayResponse toPenaltyDay(Attendance attendance, LocalDate date) {
@@ -322,7 +337,8 @@ public class AttendanceService {
         LocalDateTime checkOutAt = null;
         if (attendance.getCheckOutTime() != null) {
             checkOutAt = attendance.getAttendanceDate().atTime(attendance.getCheckOutTime());
-            if (attendance.getCheckInTime() != null && attendance.getCheckOutTime().isBefore(attendance.getCheckInTime())) {
+            if (attendance.getCheckInTime() != null
+                    && attendance.getCheckOutTime().isBefore(attendance.getCheckInTime())) {
                 checkOutAt = checkOutAt.plusDays(1);
             }
         }
@@ -337,11 +353,11 @@ public class AttendanceService {
                 penaltyPoints,
                 attendance.getLateMinutes(),
                 attendance.getUndertimeMinutes(),
-                false
-        );
+                false);
     }
 
-    private List<AttendancePenaltyDayResponse> buildPenaltyDays(UUID employeeId, int year, int month, MonthlyContext context) {
+    private List<AttendancePenaltyDayResponse> buildPenaltyDays(UUID employeeId, int year, int month,
+            MonthlyContext context) {
         YearMonth yearMonth = YearMonth.of(year, month);
         LocalDate startDate = yearMonth.atDay(1);
         LocalDate endDate = yearMonth.atEndOfMonth();
@@ -387,8 +403,10 @@ public class AttendanceService {
         }
 
         Set<LocalDate> approvedLeaveDates = new HashSet<>();
-        for (LeaveRequest leaveRequest : leaveRequestRepository.findByEmployeeIdAndStatus(employeeId, RequestStatus.APPROVED)) {
-            LocalDate leaveStart = leaveRequest.getStartDate().isBefore(startDate) ? startDate : leaveRequest.getStartDate();
+        for (LeaveRequest leaveRequest : leaveRequestRepository.findByEmployeeIdAndStatus(employeeId,
+                RequestStatus.APPROVED)) {
+            LocalDate leaveStart = leaveRequest.getStartDate().isBefore(startDate) ? startDate
+                    : leaveRequest.getStartDate();
             LocalDate leaveEnd = leaveRequest.getEndDate().isAfter(endDate) ? endDate : leaveRequest.getEndDate();
             if (leaveStart.isAfter(leaveEnd)) {
                 continue;
@@ -446,7 +464,8 @@ public class AttendanceService {
             cursor = cursor.plusDays(1);
         }
 
-        return new MonthlyContext(attendanceMap, approvedLeaveDates, workingDays, presentDays, lateDays, leaveDays, absentDays, undertimeDays, overtimeDays, totalWorkingHours);
+        return new MonthlyContext(attendanceMap, approvedLeaveDates, workingDays, presentDays, lateDays, leaveDays,
+                absentDays, undertimeDays, overtimeDays, totalWorkingHours);
     }
 
     private Employee getEmployee(UUID employeeId) {
@@ -469,7 +488,8 @@ public class AttendanceService {
         return dayOfWeek == DayOfWeek.SATURDAY || dayOfWeek == DayOfWeek.SUNDAY;
     }
 
-    public record ScoreSnapshot(double score, long lateCount, long absentCount, long undertimeCount, long overtimeCount) {
+    public record ScoreSnapshot(double score, long lateCount, long absentCount, long undertimeCount,
+            long overtimeCount) {
     }
 
     private record MonthlyContext(
@@ -484,4 +504,11 @@ public class AttendanceService {
             long overtimeDays,
             double totalWorkingHours) {
     }
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void validateCheckIn(Attendance attendance) {
+        if (attendance.getCheckInTime().isAfter(LocalTime.of(14, 00))) {
+            log.info("Check-in time exceeds the maximum allowed time of 2:00 PM");
+        }
+    }
+
 }
