@@ -61,7 +61,7 @@ public class AttendanceService {
     private final LeaveRequestRepository leaveRequestRepository;
     private final AttendanceMapper attendanceMapper;
 
-    @Transactional
+
     public AttendanceResponse checkIn(AttendanceCheckInRequest request) {
         Employee employee = getEmployee(request.getEmployeeId());
         LocalDateTime checkInAt = request.getCheckInAt() != null ? request.getCheckInAt() : LocalDateTime.now(ZONE_ID);
@@ -87,8 +87,7 @@ public class AttendanceService {
         attendance.setUndertimeMinutes(0);
         attendance.setOvertimeMinutes(0);
         attendance.setWorkingHours(0.0);
-        Attendance saved = attendanceRepository.save(attendance);
-
+        Attendance saved = this.saveAttendance(attendance);
         try {
             validateCheckIn(saved);
         }
@@ -504,11 +503,13 @@ public class AttendanceService {
             long overtimeDays,
             double totalWorkingHours) {
     }
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void validateCheckIn(Attendance attendance) {
-        if (attendance.getCheckInTime().isAfter(LocalTime.of(14, 00))) {
-            log.info("Check-in time exceeds the maximum allowed time of 2:00 PM");
+    @Transactional
+    public Attendance saveAttendance(Attendance attendance) {
+        return attendanceRepository.save(attendance);
+    }
+    private void validateCheckIn(Attendance attendance) {
+        if (attendance.getCheckInTime().isAfter(LocalTime.of(14, 0))) {
+            log.warn("Check-in time exceeds the maximum allowed time of 2:00 PM");
         }
     }
-
 }
