@@ -404,14 +404,20 @@ public class AttendanceService {
         Set<LocalDate> approvedLeaveDates = new HashSet<>();
         for (LeaveRequest leaveRequest : leaveRequestRepository.findByEmployeeIdAndStatus(employeeId,
                 RequestStatus.APPROVED)) {
-            LocalDate leaveStart = leaveRequest.getStartDate().isBefore(startDate) ? startDate
-                    : leaveRequest.getStartDate();
-            LocalDate leaveEnd = leaveRequest.getEndDate().isAfter(endDate) ? endDate : leaveRequest.getEndDate();
-            if (leaveStart.isAfter(leaveEnd)) {
+
+            if (leaveRequest.getStartDate().isBefore(startDate)) {
+                leaveRequest.setStartDate(startDate);
+            }
+            if (leaveRequest.getEndDate().isAfter(endDate)) {
+                leaveRequest.setEndDate(endDate);
+            }
+            
+            if (leaveRequest.getStartDate().isAfter(leaveRequest.getEndDate())) {
                 continue;
             }
-            LocalDate cursor = leaveStart;
-            while (!cursor.isAfter(leaveEnd)) {
+            
+            LocalDate cursor = leaveRequest.getStartDate();
+            while (!cursor.isAfter(leaveRequest.getEndDate())) {
                 approvedLeaveDates.add(cursor);
                 cursor = cursor.plusDays(1);
             }
