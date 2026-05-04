@@ -6,5 +6,4 @@ import com.example.usermanagement.entity.User;
 import java.util.UUID;
 
 public interface UserRepository extends JpaRepository<User, UUID> {
-
 }

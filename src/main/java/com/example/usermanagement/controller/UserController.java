@@ -1,8 +1,8 @@
 package com.example.usermanagement.controller;
 
-import com.example.usermanagement.dto.response.ApiResponse;
+import com.example.usermanagement.dto.ApiResponse;
+import com.example.usermanagement.dto.request.UserRequest;
 import com.example.usermanagement.dto.response.UserResponse;
-import com.example.usermanagement.entity.User;
 import com.example.usermanagement.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -17,57 +17,32 @@ public class UserController {
 
     private final UserService userService;
 
-    // CREATE
     @PostMapping
-    public ApiResponse<UserResponse> create(@RequestBody User user) {
-        return ApiResponse.<UserResponse>builder()
-                .code(1000)
-                .message("User created successfully")
-                .result(userService.create(user))
-                .build();
+    public ApiResponse<UserResponse> create(@RequestBody UserRequest request) {
+        return ApiResponse.success(userService.create(request), "User created successfully");
     }
 
-    // GET ALL
     @GetMapping
     public ApiResponse<List<UserResponse>> getAll() {
-        return ApiResponse.<List<UserResponse>>builder()
-                .code(1000)
-                .message("Success")
-                .result(userService.getAll())
-                .build();
+        return ApiResponse.success(userService.getAll(), "Success");
     }
 
-    // GET BY ID
     @GetMapping("/{id}")
     public ApiResponse<UserResponse> getById(@PathVariable UUID id) {
-        return ApiResponse.<UserResponse>builder()
-                .code(1000)
-                .message("Success")
-                .result(userService.getById(id))
-                .build();
+        return ApiResponse.success(userService.getById(id), "Success");
     }
 
-    // UPDATE
     @PutMapping("/{id}")
     public ApiResponse<UserResponse> update(
             @PathVariable UUID id,
-            @RequestBody User user
+            @RequestBody UserRequest request
     ) {
-        return ApiResponse.<UserResponse>builder()
-                .code(1000)
-                .message("Updated successfully")
-                .result(userService.update(id, user))
-                .build();
+        return ApiResponse.success(userService.update(id, request), "Updated successfully");
     }
 
-    // DELETE
     @DeleteMapping("/{id}")
     public ApiResponse<Void> delete(@PathVariable UUID id) {
         userService.delete(id);
-
-        return ApiResponse.<Void>builder()
-                .code(1000)
-                .message("Deleted successfully")
-                .build();
+        return ApiResponse.success(null, "Deleted successfully");
     }
 }
